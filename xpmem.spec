@@ -95,10 +95,15 @@ This package includes the kernel module (non KMP version).
 %setup -q
 
 %build
+env=
+if [ "$CROSS_COMPILE" != '' ]; then
+  env="$env CC=${CROSS_COMPILE}gcc"
+fi
 ./autogen.sh
 %{configure} \
   --with-module-prefix= \
   --with-kerneldir=%{K_SRC} \
+  $env \
   #
 %{make_build}
 
