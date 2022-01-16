@@ -58,7 +58,6 @@ This package includes development headers.
 %global kernel_release() $(make -C %{1} M=$PWD kernelrelease | grep -v make)
 BuildRequires: %kernel_module_package_buildreqs
 %(cat > %{_builddir}/preamble << EOF
-Requires: %{_name}
 EOF)
 %{kernel_module_package -r %{_kmp_rel} -p %{_builddir}/preamble}
 %else # not KMP
@@ -67,7 +66,6 @@ EOF)
 %global flavors_to_build default
 
 %package modules
-Requires: %{_name}
 # %{nil}: to avoid having the script that build OFED-internal
 # munge the release version here as well:
 Release%{nil}: %{release}.kver.%{krelver}
