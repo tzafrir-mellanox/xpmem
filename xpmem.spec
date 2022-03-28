@@ -7,6 +7,14 @@
 # script append_number_to_package_release.sh works:
 %global _release 1
 
+%bcond_with kernel_only
+
+%if %{with kernel_only}
+%global make_kernel_only SUBDIRS=kernel
+%else
+%global make_kernel_only %{nil}
+%endif
+
 Summary: Cross-partition memory
 Name: xpmem
 Version: 2.6.3
@@ -34,6 +42,7 @@ repository or by downloading a tarball from the link above.
 
 This package includes helper tools for the kernel module.
 
+%if ! %{with kernel_only}
 %package -n libxpmem
 Summary: XPMEM: Userspace library
 %description -n libxpmem
@@ -52,6 +61,7 @@ can be obtained by cloning the Git repository, original Mercurial
 repository or by downloading a tarball from the link above.
 
 This package includes development headers.
+%endif
 
 # build KMP rpms?
 %if "%{KMP}" == "1"
@@ -103,25 +113,31 @@ fi
   --with-kerneldir=%{K_SRC} \
   $env \
   #
-%{make_build}
+%{make_build} %{make_kernel_only}
 
 %install
-%{make_install} moduledir=%{moduledir}
+%{make_install} moduledir=%{moduledir} %{make_kernel_only}
 rm -rf $RPM_BUILD_ROOT/etc/init.d/xpmem
 mkdir -p $RPM_BUILD_ROOT%{_prefix}/lib/modules-load.d
 echo "xpmem" >$RPM_BUILD_ROOT%{_prefix}/lib/modules-load.d/xpmem.conf
+%if %{with kernel_only}
+rm -f $RPM_BUILD_ROOT/usr/lib*/pkgconfig/cray-xpmem.pc
+%endif
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
+%if ! %{with kernel_only}
 %post   -n libxpmem -p /sbin/ldconfig
 %postun -n libxpmem -p /sbin/ldconfig
+%endif
 
 %files
 /lib/udev/rules.d/*-xpmem.rules
 %{_prefix}/lib/modules-load.d/xpmem.conf
 %doc README AUTHORS COPYING COPYING.LESSER
 
+%if ! %{with kernel_only}
 %files -n libxpmem
 %{_libdir}/libxpmem.so.*
 
@@ -131,6 +147,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/libxpmem.la
 %{_libdir}/libxpmem.so
 %{_libdir}/pkgconfig/cray-xpmem.pc
+%endif
 
 %if "%{KMP}" != "1"
 %files modules
