@@ -133,6 +133,16 @@ rm -rf $RPM_BUILD_ROOT
 %postun -n libxpmem -p /sbin/ldconfig
 %endif
 
+%postun
+if [ "$1" = 0 ]; then
+	if lsmod | grep -qw xpmem; then
+		# If the module fails to unload, give an error,
+		# but don't fail uninstall. User should handle this
+		# Maybe the module is in use
+		rmmod xpmem || :
+	fi
+fi
+
 %files
 /lib/udev/rules.d/*-xpmem.rules
 %{_prefix}/lib/modules-load.d/xpmem.conf
