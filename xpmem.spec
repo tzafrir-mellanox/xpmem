@@ -1,6 +1,7 @@
 %{!?KMP: %global KMP 0}
 
 %{!?KVERSION: %global KVERSION %(uname -r)}
+%global kernel_version %{KVERSION}
 %global krelver %(echo -n %{KVERSION} | sed -e 's/-/_/g')
 %{!?K_SRC: %global K_SRC /lib/modules/%{KVERSION}/build}
 # A separate variable _release is required because of the odd way the
