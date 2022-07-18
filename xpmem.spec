@@ -92,6 +92,35 @@ repository or by downloading a tarball from the link above.
 This package includes the kernel module (non KMP version).
 %endif #end if "%{KMP}" == "1"
 
+#
+# setup module sign scripts if paths to the keys are given
+#
+%global WITH_MOD_SIGN %(if ( test -f "$MODULE_SIGN_PRIV_KEY" && test -f "$MODULE_SIGN_PUB_KEY" ); \
+	then \
+		echo -n '1'; \
+	else \
+		echo -n '0'; fi)
+
+%if "%{WITH_MOD_SIGN}" == "1"
+# call module sign script
+%global __modsign_install_post \
+    $RPM_BUILD_DIR/xpmem-%{version}/tools/sign-modules $RPM_BUILD_ROOT/lib/modules/ %{kernel_source default} || exit 1 \
+%{nil}
+
+# Disgusting hack alert! We need to ensure we sign modules *after* all
+# invocations of strip occur, which is in __debug_install_post if
+# find-debuginfo.sh runs, and __os_install_post if not.
+#
+%global __spec_install_post \
+  %{?__debug_package:%{__debug_install_post}} \
+  %{__arch_install_post} \
+  %{__os_install_post} \
+  %{__modsign_install_post} \
+%{nil}
+
+%endif # end of setup module sign scripts
+#
+
 %if "%{_vendor}" == "suse"
 %global install_mod_dir updates
 %endif
