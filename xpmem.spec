@@ -111,7 +111,7 @@ This package includes the kernel module (non KMP version).
 # invocations of strip occur, which is in __debug_install_post if
 # find-debuginfo.sh runs, and __os_install_post if not.
 #
-%global __spec_install_post \
+%define __spec_install_post \
   %{?__debug_package:%{__debug_install_post}} \
   %{__arch_install_post} \
   %{__os_install_post} \
