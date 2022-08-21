@@ -1,0 +1,5 @@
+xpmem (2.6.4-1) UNRELEASED; urgency=medium
+
+  * Initial release.
+
+ -- Tzafrir Cohen <tzafrirc@nvidia.com>  Sun, 21 Aug 2022 17:04:49 +0300
