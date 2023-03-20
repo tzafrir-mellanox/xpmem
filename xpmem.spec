@@ -17,6 +17,8 @@
 %global make_kernel_only %{nil}
 %endif
 
+%define need_firmware_dir 0%{?euleros} > 0
+
 Summary: Cross-partition memory
 Name: xpmem
 Version: 2.6.4
@@ -153,6 +155,9 @@ mkdir -p $RPM_BUILD_ROOT%{_prefix}/lib/modules-load.d
 echo "xpmem" >$RPM_BUILD_ROOT%{_prefix}/lib/modules-load.d/xpmem.conf
 %if %{with kernel_only}
 rm -f $RPM_BUILD_ROOT/usr/lib*/pkgconfig/cray-xpmem.pc
+%endif
+%if %{need_firmware_dir}
+mkdir -p $RPM_BUILD_ROOT/lib/firmware
 %endif
 
 %clean
