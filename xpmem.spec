@@ -12,6 +12,7 @@
 
 %if %{with kernel_only}
 %undefine _debugsource_packages
+%global debug_package %{nil}
 %global make_kernel_only SUBDIRS=kernel
 %else
 %global make_kernel_only %{nil}
