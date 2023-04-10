@@ -151,6 +151,7 @@ fi
 
 %install
 %{make_install} moduledir=%{moduledir} %{make_kernel_only}
+rm -rf $RPM_BUILD_ROOT/%{_libdir}/libxpmem.la
 rm -rf $RPM_BUILD_ROOT/etc/init.d/xpmem
 mkdir -p $RPM_BUILD_ROOT%{_prefix}/lib/modules-load.d
 echo "xpmem" >$RPM_BUILD_ROOT%{_prefix}/lib/modules-load.d/xpmem.conf
@@ -191,7 +192,6 @@ fi
 %files -n libxpmem-devel
 %{_prefix}/include/xpmem.h
 %{_libdir}/libxpmem.a
-%{_libdir}/libxpmem.la
 %{_libdir}/libxpmem.so
 %{_libdir}/pkgconfig/cray-xpmem.pc
 %endif
