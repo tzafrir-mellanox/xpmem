@@ -39,6 +39,14 @@ Source: %{name}-%{version}.tar.gz
 %global make_build %{__make} %{?_smp_mflags}
 %endif
 
+# Ugly workaround until anolis kmod package stops requiring
+# 'kernel(' dependencies its kernel package does not provide.
+# This uses the __find_provides from /usr/lib/rpm/redhat/macros
+# rather than the one from /usr/lib/rpm/macros.d/macros.kmp
+%if 0%{?anolis} > 0
+%{?filter_setup}
+%endif
+
 %description
 XPMEM is a Linux kernel module that enables a process to map the
 memory of another process into its virtual address space. Source code
