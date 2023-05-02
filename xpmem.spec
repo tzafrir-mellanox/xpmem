@@ -132,13 +132,12 @@ This package includes the kernel module (non KMP version).
 %endif # end of setup module sign scripts
 #
 
-%if "%{_vendor}" == "suse"
-%global install_mod_dir updates
-%endif
-
 %if 0%{?rhel} > 0
 %global install_mod_dir extra/%{_name}
 %endif
+
+%{!?install_mod_dir: %global install_mod_dir updates}
+
 %global moduledir /lib/modules/%{KVERSION}/%{install_mod_dir}
 
 %prep
