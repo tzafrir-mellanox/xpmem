@@ -27,6 +27,11 @@
 
 uint32_t xpmem_debug_on = 0;
 
+struct xpmem_config xpmem_config = {
+	.max_page_fault_after 	= XPMEM_MAX_PAGE_FAULT_AFTER,
+	.max_page_fault_before 	= XPMEM_MAX_PAGE_FAULT_BEFORE,
+};
+
 /*
  * xpmem_tg_ref() - see xpmem_private.h for inline definition
  */
@@ -316,21 +321,141 @@ xpmem_debug_printk_procfs_open(struct inode *inode, struct file *file)
 	return single_open(file, xpmem_debug_printk_procfs_show, NULL);
 }
 
+static long
+user_atol(const char __user *buffer, size_t count, long *value)
+{
+	char buf[32];
+
+	count = min(count, sizeof(buf) - 1);
+	if (copy_from_user(buf, buffer, count)) {
+		return -EFAULT;
+	}
+
+	buf[count] = '\0';
+	return kstrtol(buf, 10, value);
+}
+
+static ssize_t
+xpmem_config_max_page_fault_common(struct file *file,
+				   const char __user *buffer,
+				   size_t count, loff_t *ppos,
+				   unsigned long *target,
+				   unsigned long other)
+{
+	ssize_t size = count;
+	long value;
+	int ret;
+
+	ret = user_atol(buffer, count, &value);
+	if (ret < 0) {
+		return ret;
+	}
+	if (value < 0) {
+		return -EINVAL;
+	}
+
+	write_lock(&xpmem_config.lock);
+	if (other + value >= XPMEM_MAX_PAGE_FAULTS) {
+		size = -EINVAL;
+	} else {
+		*target = value;
+	}
+	write_unlock(&xpmem_config.lock);
+	return size;
+}
+
+static ssize_t
+xpmem_config_max_page_fault_after_write(struct file *file,
+					const char __user *buffer,
+					size_t count, loff_t *ppos)
+{
+	unsigned long *target = &xpmem_config.max_page_fault_after;
+	unsigned long other = xpmem_config.max_page_fault_before;
+	return xpmem_config_max_page_fault_common(file,
+						  buffer,
+						  count,
+						  ppos,
+						  target,
+						  other);
+}
+
+static int
+xpmem_config_max_page_fault_after_show(struct seq_file *seq, void *offset)
+{
+	seq_printf(seq, "%lu\n", xpmem_config.max_page_fault_after);
+	return 0;
+}
+
+static int
+xpmem_config_max_page_fault_after_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, xpmem_config_max_page_fault_after_show, NULL);
+}
+
+static ssize_t
+xpmem_config_max_page_fault_before_write(struct file *file,
+					 const char __user *buffer,
+					 size_t count, loff_t *ppos)
+{
+	unsigned long *target = &xpmem_config.max_page_fault_before;
+	unsigned long other = xpmem_config.max_page_fault_after;
+	return xpmem_config_max_page_fault_common(file,
+						  buffer,
+						  count,
+						  ppos,
+						  target,
+						  other);
+}
+
+static int
+xpmem_config_max_page_fault_before_show(struct seq_file *seq, void *offset)
+{
+	seq_printf(seq, "%lu\n", xpmem_config.max_page_fault_before);
+	return 0;
+}
+
+static int
+xpmem_config_max_page_fault_before_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, xpmem_config_max_page_fault_before_show, NULL);
+}
+
+void
+xpmem_max_page_fault_get(unsigned long *before, unsigned long *after)
+{
+	read_lock(&xpmem_config.lock);
+	*before = xpmem_config.max_page_fault_before;
+	*after = xpmem_config.max_page_fault_after;
+	read_unlock(&xpmem_config.lock);
+}
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,6,0)
-struct file_operations xpmem_debug_printk_procfs_ops = {
-	.owner		= THIS_MODULE,
-	.llseek		= seq_lseek,
-	.read		= seq_read,
-	.write		= xpmem_debug_printk_procfs_write,
-	.open		= xpmem_debug_printk_procfs_open,
-	.release	= single_release,
+#define XPMEM_DECLARE_CONFIG(name, writer, opener) \
+struct file_operations name = { \
+	.owner		= THIS_MODULE, \
+	.llseek		= seq_lseek, \
+	.read		= seq_read, \
+	.write		= writer, \
+	.open		= opener, \
+	.release	= single_release, \
 };
 #else
-const struct proc_ops xpmem_debug_printk_procfs_ops = {
-	.proc_lseek		= seq_lseek,
-	.proc_read		= seq_read,
-	.proc_write		= xpmem_debug_printk_procfs_write,
-	.proc_open		= xpmem_debug_printk_procfs_open,
-	.proc_release		= single_release,
-};
+#define XPMEM_DECLARE_CONFIG(name, writer, opener) \
+const struct proc_ops name = { \
+	.proc_lseek		= seq_lseek, \
+	.proc_read		= seq_read, \
+	.proc_write		= writer, \
+	.proc_open		= opener, \
+	.proc_release		= single_release, \
+}
 #endif
+
+XPMEM_DECLARE_CONFIG(xpmem_debug_printk_procfs_ops,
+		     xpmem_debug_printk_procfs_write,
+		     xpmem_debug_printk_procfs_open);
+XPMEM_DECLARE_CONFIG(xpmem_config_max_page_fault_after_procfs_ops,
+		     xpmem_config_max_page_fault_after_write,
+		     xpmem_config_max_page_fault_after_open);
+XPMEM_DECLARE_CONFIG(xpmem_config_max_page_fault_before_procfs_ops,
+		     xpmem_config_max_page_fault_before_write,
+		     xpmem_config_max_page_fault_before_open);

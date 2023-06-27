@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/#{ENV['BOX_NAME']}"
+  config.vm.provision "shell", :path => "entrypoint.sh", args: "#{ENV['BOX_NAME']} #{ENV['SYSTEM_PULLREQUEST_PULLREQUESTNUMBER']}"
+  config.vm.define "#{ENV['BOX_NAME']}" do |vm01|
+    vm01.vm.provider :libvirt do |libvirt|
+    vm01.vm.box_check_update = false
+        libvirt.memory = 8192
+        libvirt.cpus = 8
+    end
+  end
+end

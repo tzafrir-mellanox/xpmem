@@ -78,6 +78,8 @@ xpmem_open(struct inode *inode, struct file *file)
 		return -ENOMEM;
 	}
 
+	rwlock_init(&xpmem_config.lock);
+
 	spin_lock_init(&tg->lock);
 	tg->tgid = current->tgid;
 	tg->uid = current_uid();
@@ -405,6 +407,7 @@ xpmem_init(void)
 	int i, ret;
 	struct proc_dir_entry *global_pages_entry;
 	struct proc_dir_entry *debug_printk_entry;
+	struct proc_dir_entry *config_entry;
 
 	/* create and initialize struct xpmem_partition array */
 	xpmem_my_part = kzalloc(sizeof(struct xpmem_partition) +
@@ -452,6 +455,22 @@ xpmem_init(void)
 		goto out_4;
 	}
 
+	config_entry = proc_create("faults_after", 0644,
+				   xpmem_unpin_procfs_dir,
+				   &xpmem_config_max_page_fault_after_procfs_ops);
+	if (!config_entry) {
+		ret = -EBUSY;
+		goto out_4;
+	}
+
+	config_entry = proc_create("faults_before", 0644,
+				   xpmem_unpin_procfs_dir,
+				   &xpmem_config_max_page_fault_before_procfs_ops);
+	if (!config_entry) {
+		ret = -EBUSY;
+		goto out_4;
+	}
+
 	printk("XPMEM kernel module v%s loaded\n",
 	       XPMEM_CURRENT_VERSION_STRING);
 	return 0;
@@ -478,6 +497,8 @@ xpmem_exit(void)
 	misc_deregister(&xpmem_dev_handle);
 	remove_proc_entry("global_pages", xpmem_unpin_procfs_dir);
 	remove_proc_entry("debug_printk", xpmem_unpin_procfs_dir);
+	remove_proc_entry("faults_after", xpmem_unpin_procfs_dir);
+	remove_proc_entry("faults_before", xpmem_unpin_procfs_dir);
 	remove_proc_entry(XPMEM_MODULE_NAME, NULL);
 
 	printk("XPMEM kernel module v%s unloaded\n",
@@ -491,6 +512,6 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Silicon Graphics, Inc.");
 MODULE_INFO(supported, "external");
 MODULE_DESCRIPTION("XPMEM support");
-MODULE_VERSION("2.6.5");
+MODULE_VERSION("2.7.0");
 module_init(xpmem_init);
 module_exit(xpmem_exit);

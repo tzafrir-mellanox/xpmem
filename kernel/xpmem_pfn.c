@@ -112,7 +112,7 @@ xpmem_hugetlb_pte(pte_t *pte, struct mm_struct *mm, u64 vaddr, u64 *offset)
  * Given an address space and a virtual address return a pointer to its
  * pte if one is present.
  */
-static pte_t *
+pte_t *
 xpmem_vaddr_to_pte_offset(struct mm_struct *mm, u64 vaddr, u64 *offset)
 {
 	pgd_t *pgd;
@@ -226,18 +226,103 @@ xpmem_vaddr_to_pte_size(struct mm_struct *mm, u64 vaddr, u64 *size)
 	return pte;
 }
 
+static void
+xpmem_put_page(struct page *page)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0)
+	put_page(page);
+#else
+	page_cache_release(page);
+#endif
+}
+
+struct remap_context {
+	struct xpmem_segment  *seg;
+	struct page           **pages;
+	unsigned long         index;
+	unsigned long         count;
+	struct vm_area_struct *vma;
+	u64                   vaddr;
+	int                   result;
+};
+
+#ifdef HAVE_LATEST_APPLY_TO_PAGE_RANGE
+static int remap_func(pte_t *pte, unsigned long addr, void *data)
+#else
+static int remap_func(pte_t *pte, pgtable_t token, unsigned long addr,
+		      void *data)
+#endif
+{
+	struct remap_context *ctx = data;
+	struct xpmem_segment *seg = ctx->seg;
+	struct page *page = ctx->pages[ctx->index++];
+	unsigned long pfn = page_to_pfn(page);
+	unsigned long old_pfn = pte_pfn(*pte);
+
+	BUG_ON(!pfn_valid(pfn));
+
+	if (addr == ctx->vaddr) {
+		if (!old_pfn || pfn == old_pfn) {
+			ctx->result = VM_FAULT_NOPAGE;
+		} else {
+			/* should not be possible, but just in case */
+			XPMEM_DEBUG("remap_func: vaddr:%lx pfn mismatch: "
+				    "%ld != %ld\n", addr, old_pfn, pfn);
+		}
+	}
+
+	if (old_pfn) {
+		xpmem_put_page(page);
+		atomic_dec(&seg->tg->n_pinned);
+		atomic_inc(&xpmem_my_part->n_unpinned);
+		return 0;
+	}
+
+	/* Special PTE are not associated with any struct page */
+	set_pte_at(ctx->vma->vm_mm, addr, pte,
+		   pte_mkspecial(pfn_pte(pfn, ctx->vma->vm_page_prot)));
+	return 0;
+}
+
+int
+xpmem_remap_pages(struct xpmem_segment *seg,
+		  struct vm_area_struct *vma, u64 vaddr, u64 start,
+		  struct page **pages, unsigned long nr_pages)
+{
+	unsigned long i;
+	struct remap_context ctx = {
+		.seg = seg,
+		.pages = pages,
+		.index = 0,
+		.count = nr_pages,
+		.vma = vma,
+		.vaddr = vaddr,
+		.result = 0,
+	};
+
+	(void)apply_to_page_range(current->mm, start, nr_pages * PAGE_SIZE,
+				  remap_func, &ctx);
+	for (i = ctx.index; i < nr_pages; i++) {
+		xpmem_put_page(ctx.pages[i]);
+		atomic_dec(&seg->tg->n_pinned);
+		atomic_inc(&xpmem_my_part->n_unpinned);
+	}
+	return ctx.result;
+}
+
 /*
  * Fault in and pin a single page for the specified task and mm.
  */
 static int
-xpmem_pin_page(struct xpmem_thread_group *tg, struct task_struct *src_task,
-		struct mm_struct *src_mm, u64 vaddr, unsigned long *pfn)
+xpmem_pin_pages(struct xpmem_thread_group *tg, struct task_struct *src_task,
+	       struct mm_struct *src_mm, u64 vaddr, struct page **pages,
+	       unsigned long count)
 {
-	int ret;
-	struct page *page;
+	int nr_pinned;
 	struct vm_area_struct *vma;
 	cpumask_t saved_mask = CPU_MASK_NONE;
 	int foll_write;
+	unsigned long avail;
 
 	vma = find_vma(src_mm, vaddr);
 	if (!vma || vma->vm_start > vaddr)
@@ -246,6 +331,9 @@ xpmem_pin_page(struct xpmem_thread_group *tg, struct task_struct *src_task,
 	/* don't pin pages in address ranges attached from other thread groups */
 	if (xpmem_is_vm_ops_set(vma))
 		return -ENOENT;
+
+	avail = (vma->vm_end - vaddr) >> PAGE_SHIFT;
+	count = min(count, avail);
 
 	/*
 	 * get_user_pages() may have to allocate pages on behalf of
@@ -271,32 +359,29 @@ xpmem_pin_page(struct xpmem_thread_group *tg, struct task_struct *src_task,
 
 	/* get_user_pages()/get_user_pages_remote() faults and pins the page */
 #if   LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
-	ret = get_user_pages_remote (src_mm, vaddr, 1, foll_write, &page, NULL,
-				     NULL);
+	nr_pinned = get_user_pages_remote (src_mm, vaddr, count, foll_write, pages,
+				     NULL, NULL);
 #elif   LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
-	ret = get_user_pages_remote (src_task, src_mm, vaddr, 1, foll_write,
-				     &page, NULL, NULL);
+	nr_pinned = get_user_pages_remote (src_task, src_mm, vaddr, count,
+				     foll_write, pages, NULL, NULL);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
-	ret = get_user_pages_remote (src_task, src_mm, vaddr, 1, foll_write,
-				     &page, NULL);
+	nr_pinned = get_user_pages_remote (src_task, src_mm, vaddr, count,
+				     foll_write, pages, NULL);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
-	ret = get_user_pages_remote (src_task, src_mm, vaddr, 1, foll_write, 0,
-				     &page, NULL);
+	nr_pinned = get_user_pages_remote (src_task, src_mm, vaddr, count,
+				     foll_write, 0, pages, NULL);
 #else
-	ret = get_user_pages (src_task, src_mm, vaddr, 1, foll_write, 0, &page,
-			      NULL);
+	nr_pinned = get_user_pages (src_task, src_mm, vaddr, count, foll_write, 0,
+			      pages, NULL);
 #endif
 	if (!cpumask_empty(&saved_mask))
 		set_cpus_allowed_ptr(current, &saved_mask);
 
-	if (ret == 1) {
-		*pfn = page_to_pfn(page);
-		atomic_inc(&tg->n_pinned);
-		atomic_inc(&xpmem_my_part->n_pinned);
-		ret = 0;
+	if (nr_pinned > 0) {
+		atomic_add(nr_pinned, &tg->n_pinned);
+		atomic_add(nr_pinned, &xpmem_my_part->n_pinned);
 	}
-
-	return ret;
+	return nr_pinned;
 }
 
 /*
@@ -356,19 +441,20 @@ xpmem_unpin_pages(struct xpmem_segment *seg, struct mm_struct *mm,
  * Given a virtual address and XPMEM segment, pin the page.
  */
 int
-xpmem_ensure_valid_PFN(struct xpmem_segment *seg, u64 vaddr, unsigned long *pfn)
+xpmem_ensure_valid_PFN(struct xpmem_segment *seg, u64 vaddr,
+		       struct page **pages, unsigned long count)
 {
-  int ret;
+	int pinned;
 	struct xpmem_thread_group *seg_tg = seg->tg;
 
 	/* the seg may have been marked for destruction while we were down() */
-        if (seg->flags & XPMEM_FLAG_DESTROYING)
+	if (seg->flags & XPMEM_FLAG_DESTROYING)
 		return -ENOENT;
 
 	/* pin PFN */
-	ret = xpmem_pin_page(seg_tg, seg_tg->group_leader, seg_tg->mm, vaddr, pfn);
-
-	return ret;
+	pinned = xpmem_pin_pages(seg_tg, seg_tg->group_leader, seg_tg->mm, vaddr,
+			     pages, count);
+	return pinned;
 }
 
 /*

@@ -24,9 +24,9 @@ KCPPFLAGS = -include @abs_top_builddir@/config.h -I@abs_top_srcdir@/include
 export KCPPFLAGS
 
 $(MODULE): ${module_sources}
-	$(MAKE) -C $(KERNEL_PATH) M=$(abs_builddir) src=$(abs_srcdir)
+	$(MAKE) -C $(KERNEL_PATH) M=$(abs_builddir)
 
 clean-local:
-	$(MAKE) -C $(KERNEL_PATH) M=$(abs_builddir) src=$(abs_srcdir) clean
+	$(MAKE) -C $(KERNEL_PATH) M=$(abs_builddir) clean
 
 .PHONY: $(MODULE)

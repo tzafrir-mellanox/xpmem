@@ -69,8 +69,8 @@
  *       major - major revision number (12-bits)
  *       minor - minor revision number (16-bits)
  */
-#define XPMEM_CURRENT_VERSION		0x00026005
-#define XPMEM_CURRENT_VERSION_STRING	"2.6.5"
+#define XPMEM_CURRENT_VERSION		0x00027000
+#define XPMEM_CURRENT_VERSION_STRING	"2.7.0"
 
 #define XPMEM_MODULE_NAME "xpmem"
 
@@ -263,6 +263,21 @@ struct xpmem_partition {
 #define XPMEM_NODE_OFFLINE		-2
 #define XPMEM_CPUS_OFFLINE		-2
 
+/*
+ * Pre-fault pages forward and backward
+ */
+#define XPMEM_MAX_PAGE_FAULT_AFTER 32
+#define XPMEM_MAX_PAGE_FAULT_BEFORE 16
+#define XPMEM_MAX_PAGE_FAULTS 128
+
+struct xpmem_config {
+	rwlock_t lock;
+	unsigned long max_page_fault_after;
+	unsigned long max_page_fault_before;
+};
+
+extern struct xpmem_config xpmem_config;
+
 /* found in xpmem_make.c */
 extern int xpmem_make(u64, size_t, int, void *, xpmem_segid_t *);
 extern void xpmem_remove_segs_of_tg(struct xpmem_thread_group *);
@@ -285,7 +300,10 @@ extern void xpmem_detach_att(struct xpmem_access_permit *,
 extern int xpmem_mmap(struct file *, struct vm_area_struct *);
 
 /* found in xpmem_pfn.c */
-extern int xpmem_ensure_valid_PFN(struct xpmem_segment *, u64, unsigned long *);
+extern int xpmem_ensure_valid_PFN(struct xpmem_segment *, u64, struct page **,
+				  unsigned long);
+extern pte_t *xpmem_vaddr_to_pte_offset(
+	struct mm_struct *mm, u64 vaddr, u64 *offset);
 extern u64 xpmem_vaddr_to_PFN(struct mm_struct *mm, u64 vaddr);
 extern int xpmem_block_recall_PFNs(struct xpmem_thread_group *, int);
 extern void xpmem_unpin_pages(struct xpmem_segment *, struct mm_struct *, u64,
@@ -298,8 +316,12 @@ extern spinlock_t xpmem_unpin_procfs_lock;
 extern struct proc_dir_entry *xpmem_unpin_procfs_dir;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,6,0)
 extern struct file_operations xpmem_unpin_procfs_ops;
+extern struct file_operations xpmem_config_max_page_fault_after_procfs_ops;
+extern struct file_operations xpmem_config_max_page_fault_before_procfs_ops;
 #else
 extern const struct proc_ops xpmem_unpin_procfs_ops;
+extern const struct proc_ops xpmem_config_max_page_fault_after_procfs_ops;
+extern const struct proc_ops xpmem_config_max_page_fault_before_procfs_ops;
 #endif
 
 
@@ -308,6 +330,8 @@ extern struct xpmem_partition *xpmem_my_part;
 void xpmem_teardown(struct xpmem_thread_group *tg);
 
 /* found in xpmem_misc.c */
+void xpmem_max_page_fault_get(unsigned long *before, unsigned long *after);
+
 extern struct xpmem_thread_group *
 __xpmem_tg_ref_by_tgid_nolock_internal(pid_t tgid, int index, int return_destroying);
 static inline struct xpmem_thread_group *__xpmem_tg_ref_by_tgid(pid_t tgid, int return_destroying) {
@@ -383,6 +407,11 @@ extern const struct proc_ops xpmem_debug_printk_procfs_ops;
 /* found in xpmem_mmu_notifier.c */
 extern int xpmem_mmu_notifier_init(struct xpmem_thread_group *);
 extern void xpmem_mmu_notifier_unlink(struct xpmem_thread_group *);
+
+int
+xpmem_remap_pages(struct xpmem_segment *seg,
+		  struct vm_area_struct *vma, u64 vaddr, u64 start,
+		  struct page **pages, unsigned long nr_pages);
 
 /*
  * Inlines that mark an internal driver structure as being destroyable or not.

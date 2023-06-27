@@ -18,7 +18,7 @@
 #include <linux/percpu.h>
 
 #include <asm/tlbflush.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 
 #include "xpmem_internal.h"
 #include "xpmem_private.h"

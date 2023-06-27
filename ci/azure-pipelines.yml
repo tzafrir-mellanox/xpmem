@@ -1,0 +1,160 @@
+trigger: none
+pr:
+  branches:
+    include:
+    - master
+    - v*.*.x
+  paths:
+    exclude:
+    - .git*
+    - /**/*.md
+    - NEWS
+    - AUTHORS
+
+resources:
+  containers:
+    - container: centos7
+      image: rdmz-harbor.rdmz.labs.mlnx/xpmem/x86_64/centos7:1
+    - container: centos8
+      image: rdmz-harbor.rdmz.labs.mlnx/xpmem/x86_64/centos8:1
+    - container: ubuntu18
+      image: rdmz-harbor.rdmz.labs.mlnx/xpmem/x86_64/ubuntu18.04:1
+    - container: ubuntu20
+      image: rdmz-harbor.rdmz.labs.mlnx/xpmem/x86_64/ubuntu20.04:1
+    - container: ubuntu22
+      image: rdmz-harbor.rdmz.labs.mlnx/xpmem/x86_64/ubuntu22.04:1
+    - container: fedora
+      image: rdmz-harbor.rdmz.labs.mlnx/ucx/fedora33:1
+
+stages:
+  - stage: Codestyle
+    jobs:
+      - job: format
+        displayName: Format code
+        pool:
+          name: MLNX
+          demands:
+          - ucx_docker
+        container: fedora
+        steps:
+          - checkout: self
+            clean: true
+            fetchDepth: 100
+          - bash: |
+              set -x
+              BASE_SOURCEVERSION=$(git rev-parse HEAD^)
+              echo "Checking code format on diff ${BASE_SOURCEVERSION}..${BUILD_SOURCEVERSION}"
+              PATCH=$(git-clang-format --diff ${BASE_SOURCEVERSION} ${BUILD_SOURCEVERSION} ./)
+              if [ "$PATCH" = "no modified files to format" ]; then
+                  exit
+              fi
+              echo "$PATCH" | git apply
+              if ! git diff --quiet --exit-code; then
+                set +x
+                echo "##vso[task.complete result=SucceededWithIssues;]DONE Code is not formatted correctly"
+              fi
+            condition: eq(variables['Build.Reason'], 'PullRequest')
+            displayName: Check gtest code format
+            workingDirectory: $(System.DefaultWorkingDirectory)/test/gtest
+
+  - stage: Build
+    dependsOn: Codestyle
+    jobs:
+      - job: Build
+        pool:
+          name: MLNX
+          demands:
+            - ucx_docker
+
+        strategy:
+          matrix:
+            centos7:
+              build_container: centos7
+            centos8:
+              build_container: centos8
+            ubuntu18:
+              build_container: ubuntu18
+            ubuntu20:
+              build_container: ubuntu20
+            ubuntu22:
+              build_container: ubuntu22
+        container: $[ variables['build_container'] ]
+
+        steps:
+          - checkout: self
+            clean: true
+            fetchDepth: 100
+    
+          - bash: |
+              set -eEx
+              ./autogen.sh
+              kernel_ver=$(rpm -qa | grep kernel-devel | cut -d'-' -f3-)
+              ./configure --with-kerneldir=/usr/src/kernels/${kernel_ver}
+              make
+            displayName: Build CentOS
+            condition: contains(variables['build_container'], 'centos')
+
+          - bash: |
+              set -eEx
+              ./autogen.sh
+              kernel_ver=$(dpkg -l | grep 'linux-headers-.*-generic' | awk '{print $2}')
+              ./configure --with-kerneldir=/usr/src/${kernel_ver}
+              make
+            displayName: Build Ubuntu
+            condition: contains(variables['build_container'], 'ubuntu')
+
+  - stage: Test
+    dependsOn: Codestyle
+    jobs:
+      - job: Test
+        workspace:
+          clean: all
+        pool:
+          name: MLNX
+          demands:
+            - ucx_vagrant
+
+        strategy:
+          matrix:
+            centos7:
+              BOX_NAME: centos7
+            ubuntu18:
+              BOX_NAME: ubuntu1804
+            ubuntu20:
+              BOX_NAME: ubuntu2004
+            ubuntu22:
+              BOX_NAME: ubuntu2204
+
+        steps:
+          - checkout: self
+            clean: true
+            fetchDepth: 100
+    
+          - bash: |
+              set -x
+              export VAGRANT_HOME=/opt/vagrant_home
+              vagrant up
+            displayName: Bring up VM
+            workingDirectory: $(System.DefaultWorkingDirectory)/ci/vm/
+
+          - bash: |
+              vagrant ssh -- -t '
+                cd xpmem/test/share
+                sudo ./run.sh
+              '
+            displayName: Old tests
+            workingDirectory: $(System.DefaultWorkingDirectory)/ci/vm/
+
+          - bash: |
+              vagrant ssh -- -t '
+                sudo ./xpmem/test/gtest/gtest
+              '
+            displayName: Gtest
+            workingDirectory: $(System.DefaultWorkingDirectory)/ci/vm/
+
+          - bash: |
+              vagrant destroy -f
+              vagrant global-status --prune
+            condition: always()
+            displayName: Bring down VM
+            workingDirectory: $(System.DefaultWorkingDirectory)/ci/vm/

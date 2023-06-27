@@ -125,6 +125,16 @@ AC_DEFUN([AC_KERNEL_CHECKS],
 
   AC_CHECK_DECLS([vma_iter_init], [], [], [[#include <linux/mm_types.h>]])
 
+  AC_MSG_CHECKING(latest apply_to_page_range support)
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+      #include <linux/mm.h>
+      extern pte_fn_t callback;
+    ]], [[
+      int a = callback(NULL, 1, NULL);
+    ]])], [
+    AC_DEFINE([HAVE_LATEST_APPLY_TO_PAGE_RANGE], 1, [Have latest page iterator])
+  ], [])
+
   CPPFLAGS="$save_CPPFLAGS"
 ]
 )

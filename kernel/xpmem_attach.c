@@ -163,6 +163,122 @@ out:
 #endif
 }
 
+/* Find the range of non present entries */
+static u64
+xpmem_fault_vaddr_end(u64 vm_end, u64 addr, unsigned long max_pages)
+{
+	for (; max_pages; max_pages--, addr += PAGE_SIZE) {
+		if (addr >= vm_end) {
+			break;
+		}
+		if (xpmem_vaddr_to_pte_offset(current->mm, addr, NULL)) {
+			break;
+		}
+	}
+	return addr;
+}
+
+/* Find the range of non present entries before the request address */
+static u64
+xpmem_fault_vaddr_start(u64 vm_start, u64 addr, unsigned long max_pages)
+{
+	for (; max_pages; max_pages--, addr -= PAGE_SIZE) {
+		if (addr <= vm_start) {
+			break;
+		}
+		if (xpmem_vaddr_to_pte_offset(current->mm, addr - PAGE_SIZE, NULL)) {
+			break;
+		}
+	}
+	return addr;
+}
+
+static int
+xpmem_fault_pages(struct xpmem_segment *seg, struct vm_area_struct *vma,
+		  u64 vaddr)
+{
+	int npages;
+	u64 seg_vaddr;
+	u64 end;
+	u64 start;
+	struct xpmem_attachment *att;
+	unsigned long nr_pages;
+	struct vm_area_struct *src_vma;
+	unsigned long pages_after;
+	unsigned long pages_before;
+	struct page *pages[XPMEM_MAX_PAGE_FAULTS];
+	int result = 0;
+
+	xpmem_max_page_fault_get(&pages_before, &pages_after);
+
+	att = vma->vm_private_data;
+	if (!att) {
+		goto out;
+	}
+
+	if (vaddr < att->at_vaddr || vaddr + 1 > att->at_vaddr + att->at_size) {
+		goto out;
+	}
+	if (vaddr < vma->vm_start || vaddr >= vma->vm_end) {
+		goto out;
+	}
+
+	end = min((u64)vma->vm_end, att->at_vaddr + att->at_size);
+	start = max((u64)vma->vm_start, att->at_vaddr);
+
+	/*
+	 * When calling memcpy(), glibc can use memmove() instead, which can fault
+	 * pages backward, so we have following possible faulting patterns:
+	 * - Random: start <= vaddr and end > vaddr
+	 * - Forward: start == vaddr as previous PTE's are present, end > vaddr
+	 * - Backward: end == vaddr + 1, as PTE's after are present, start <= vaddr
+	 */
+	end = xpmem_fault_vaddr_end(end, vaddr + PAGE_SIZE, pages_after);
+	start = xpmem_fault_vaddr_start(start, vaddr, pages_before);
+
+	XPMEM_DEBUG("vaddr = %llx, start = %llx, end = %llx", vaddr, start,
+		    end);
+
+	while (start < end) {
+		/* translate current fault vaddr to the source vaddr */
+		seg_vaddr = (att->vaddr & PAGE_MASK) + (start - att->at_vaddr);
+
+		nr_pages = (end - start) >> PAGE_SHIFT;
+		BUG_ON(nr_pages > XPMEM_MAX_PAGE_FAULTS);
+
+		npages = xpmem_ensure_valid_PFN(seg, seg_vaddr, pages, nr_pages);
+		if (npages >= 0) {
+			att->flags |= XPMEM_FLAG_VALIDPTEs;
+		}
+		if (npages <= 0) {
+			src_vma = find_vma(seg->tg->mm, seg_vaddr);
+			if (!src_vma) {
+				break;
+			}
+			if (src_vma->vm_start > seg_vaddr) {
+				start += src_vma->vm_start - seg_vaddr;
+			} else {
+				/* seg_vaddr is inside src_vma, but it is not usable */
+				start += src_vma->vm_end - seg_vaddr;
+			}
+			continue;
+		}
+
+		XPMEM_DEBUG("calling xpmem_remap_pages() vaddr=%llx "
+			    "start=%llx npages=%d", vaddr, start, npages);
+		result |= xpmem_remap_pages(seg, vma, vaddr, start, pages, npages);
+		start += npages << PAGE_SHIFT;
+	}
+out:
+	if (!result) {
+		result = VM_FAULT_SIGBUS;
+	}
+	if (result & VM_FAULT_SIGBUS) {
+		XPMEM_DEBUG("fault returning SIGBUS vaddr=%llx", vaddr);
+	}
+	return result;
+}
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 static vm_fault_t
 xpmem_fault_handler(struct vm_fault *vmf)
@@ -175,10 +291,11 @@ xpmem_fault_handler(struct vm_area_struct *vma, struct vm_fault *vmf)
 #endif
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-	vm_fault_t ret;
+	vm_fault_t result;
 #else
-	int ret;
+	int result;
 #endif
+	int ret;
 	int att_locked = 0;
 	int seg_tg_mmap_sem_locked = 0, vma_verification_needed = 0;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
@@ -189,8 +306,6 @@ xpmem_fault_handler(struct vm_area_struct *vma, struct vm_fault *vmf)
 #else
         u64 vaddr = (u64)(uintptr_t) vmf->virtual_address;
 #endif
-	u64 seg_vaddr;
-	unsigned long pfn = 0, old_pfn = 0;
 	struct xpmem_thread_group *ap_tg, *seg_tg;
 	struct xpmem_access_permit *ap;
 	struct xpmem_attachment *att;
@@ -227,6 +342,8 @@ xpmem_fault_handler(struct vm_area_struct *vma, struct vm_fault *vmf)
 	xpmem_seg_ref(seg);
 	seg_tg = seg->tg;
 	xpmem_tg_ref(seg_tg);
+
+	result = VM_FAULT_SIGBUS;
 
 	/*
 	 * The faulting thread has its mmap_sem/mmap_lock locked on entrance to this
@@ -286,18 +403,7 @@ xpmem_fault_handler(struct vm_area_struct *vma, struct vm_fault *vmf)
 	    (seg_tg->flags & XPMEM_FLAG_DESTROYING))
 		goto out_2;
 
-	if (vaddr < att->at_vaddr || vaddr + 1 > att->at_vaddr + att->at_size)
-		goto out_2;
-
-	/* translate the fault virtual address to the source virtual address */
-	seg_vaddr = (att->vaddr & PAGE_MASK) + (vaddr - att->at_vaddr);
-	XPMEM_DEBUG("vaddr = %llx, seg_vaddr = %llx", vaddr, seg_vaddr);
-
-        ret = xpmem_ensure_valid_PFN(seg, seg_vaddr, &pfn);
-        if (ret != 0)
-		goto out_2;
-
-	att->flags |= XPMEM_FLAG_VALIDPTEs;
+	result = xpmem_fault_pages(seg, vma, vaddr);
 
 out_2:
 	xpmem_seg_up_read(seg_tg, seg, 1);
@@ -305,43 +411,6 @@ out_1:
 	xpmem_ap_deref(ap);
 	xpmem_tg_deref(ap_tg);
 
-	ret = VM_FAULT_SIGBUS;
-
-	/*
-	 * remap_pfn_range() does not allow racing threads to each insert
-	 * the PFN for a given virtual address.  To account for this, we
-	 * call remap_pfn_range() with the att->mutex locked and don't
-	 * perform the redundant remap_pfn_range() when a PFN already exists.
-	 */
-        if (pfn && pfn_valid(pfn)) {
-		old_pfn = xpmem_vaddr_to_PFN(current->mm, vaddr);
-		if (old_pfn) {
-			if (old_pfn == pfn) {
-				ret = VM_FAULT_NOPAGE;
-			} else {
-				/* should not be possible, but just in case */
-				printk("xpmem_fault_handler: pfn mismatch: "
-				       "%ld != %ld\n", old_pfn, pfn);
-			}
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0)
-			put_page(pfn_to_page(pfn));
-#else
-			page_cache_release(pfn_to_page(pfn));
-#endif
-			atomic_dec(&seg->tg->n_pinned);
-			atomic_inc(&xpmem_my_part->n_unpinned);
-			goto out;
-		}
-
-		XPMEM_DEBUG("calling remap_pfn_range() vaddr=%llx, pfn=%lx",
-				vaddr, pfn);
-		if ((remap_pfn_range(vma, vaddr, pfn, PAGE_SIZE,
-				     vma->vm_page_prot)) == 0) {
-			ret = VM_FAULT_NOPAGE;
-		}
-	}
-out:
 	if (seg_tg_mmap_sem_locked)
 		xpmem_mmap_read_unlock(seg_tg->mm);
 
@@ -354,11 +423,7 @@ out:
         xpmem_seg_deref(seg);
 	xpmem_att_deref(att);
 
-	if (ret == VM_FAULT_SIGBUS) {
-		XPMEM_DEBUG("fault returning SIGBUS vaddr=%llx, pfn=%lx", vaddr, pfn);
-	}
-
-	return ret;
+	return result;
 }
 
 struct vm_operations_struct xpmem_vm_ops = {

@@ -1,0 +1,18 @@
+#
+# Copyright (c) NVIDIA CORPORATION & AFFILIATES, 2023. ALL RIGHTS RESERVED.
+#
+# See file LICENSE for terms.
+#
+
+## Current
+### Features:
+#### Kernel driver:
+#### Bugfixes:
+
+## 2.7.0 (June 13, 2023)
+### Features:
+#### Kernel driver:
+ * Added faulting of multiple pages at once, forward and backward
+#### Bugfixes:
+ * Added compilation fixes for PPC on Ubuntu 18.04
+ * Fixed vma_iterator compilation issue on kernel 6.1 onwards
