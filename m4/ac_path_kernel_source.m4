@@ -135,6 +135,8 @@ AC_DEFUN([AC_KERNEL_CHECKS],
     AC_DEFINE([HAVE_LATEST_APPLY_TO_PAGE_RANGE], 1, [Have latest page iterator])
   ], [])
 
+  AC_CHECK_DECLS([vm_flags_set], [], [], [[#include <linux/mm.h>]])
+
   CPPFLAGS="$save_CPPFLAGS"
 ]
 )

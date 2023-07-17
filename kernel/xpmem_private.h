@@ -69,8 +69,8 @@
  *       major - major revision number (12-bits)
  *       minor - minor revision number (16-bits)
  */
-#define XPMEM_CURRENT_VERSION		0x00027000
-#define XPMEM_CURRENT_VERSION_STRING	"2.7.0"
+#define XPMEM_CURRENT_VERSION		0x00027002
+#define XPMEM_CURRENT_VERSION_STRING	"2.7.2"
 
 #define XPMEM_MODULE_NAME "xpmem"
 
@@ -382,6 +382,13 @@ struct vma_iterator {
 	for ((_vma) = find_vma_intersection((_vmi).mm, (_vmi).start, (_end)); \
 	     (_vma) && (_vma)->vm_start < (_end); \
 	     (_vma) = (_vma)->vm_next)
+#endif
+
+#if (!HAVE_DECL_VM_FLAGS_SET)
+static inline void vm_flags_set(struct vm_area_struct *vma, vm_flags_t flags)
+{
+	vma->vm_flags |= flags;
+}
 #endif
 
 extern struct xpmem_thread_group *xpmem_tg_ref_by_segid(xpmem_segid_t);

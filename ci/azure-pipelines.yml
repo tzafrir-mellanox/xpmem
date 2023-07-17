@@ -98,7 +98,7 @@ stages:
               set -eEx
               ./autogen.sh
               kernel_ver=$(dpkg -l | grep 'linux-headers-.*-generic' | awk '{print $2}')
-              ./configure --with-kerneldir=/usr/src/${kernel_ver}
+              ./configure --enable-gtest --with-kerneldir=/usr/src/${kernel_ver}
               make
             displayName: Build Ubuntu
             condition: contains(variables['build_container'], 'ubuntu')

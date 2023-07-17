@@ -4,7 +4,7 @@
 # See file LICENSE for terms.
 #
 
-if HAVE_CXX14
+if HAVE_GTEST
 
 SUBDIRS = common/googletest
 

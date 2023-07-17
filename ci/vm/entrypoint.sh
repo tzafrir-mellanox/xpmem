@@ -34,13 +34,13 @@ xpmem_build() {
   git checkout FETCH_HEAD
   ./autogen.sh
   if [[ $OS == *"ubuntu"* ]]; then
-    ./configure --with-kerneldir=/usr/src/linux-headers-"$(uname -r)"
+    ./configure --enable-gtest --with-kerneldir=/usr/src/linux-headers-"$(uname -r)"
     make -s
     make check
   elif [[ $OS == *"centos"* ]]; then
     # Build with GCC-8
     scl enable devtoolset-8 -- bash -c "
-      ./configure --with-kerneldir=/usr/src/kernels/'$(uname -r)'
+      ./configure --enable-gtest --with-kerneldir=/usr/src/kernels/'$(uname -r)'
       make -s
       make check
     "

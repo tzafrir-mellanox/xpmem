@@ -36,7 +36,6 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([int x = 0b101010;])],
 AC_MSG_RESULT([$have_cxx14])
 AC_LANG_POP
 CXXFLAGS="$save_CXXFLAGS"
-AM_CONDITIONAL([HAVE_CXX14], [test "x$have_cxx14" = "xyes"])
 
 # Checks for library functions.
 AC_PROG_GCC_TRADITIONAL
@@ -48,6 +47,21 @@ AC_ARG_WITH([module-prefix],
                             [Prefix for kernel module installation])],
             [],
             [with_module_prefix=$prefix])
+
+# Check for gtest being requested
+AC_ARG_ENABLE([gtest],
+  [AS_HELP_STRING([--enable-gtest],
+                  [Enable tests using the Google C++ Testing Framework.
+                  (Default is disabled.)])],
+  [enable_gtest=$enableval],
+  [enable_gtest=no])
+
+AC_MSG_CHECKING([for using Google C++ Testing Framework])
+AC_MSG_RESULT([$enable_gtest])
+# Check gtest can only build with C++14 support
+AS_IF([test "x$enable_gtest" = "xyes" && test "x$have_cxx14" != "xyes"],
+      [AC_MSG_ERROR([gtest enabled without C++14 compiler support])])
+AM_CONDITIONAL([HAVE_GTEST], [test "x$enable_gtest" = "xyes"])
 
 AC_SUBST([moduleprefix], [${with_module_prefix%%/}])
 AC_SUBST([initdir], [${sysconfdir}/init.d])
