@@ -105,6 +105,7 @@ AC_DEFUN([AC_KERNEL_CHECKS],
   CPPFLAGS="-include $kerneldir/include/linux/kconfig.h \
             -include $kerneldir/include/linux/compiler.h \
             -D__KERNEL__ \
+            -DKBUILD_MODNAME=\"xpmem_configure\" \
             -I$kerneldir/include \
             -I$kerneldir/include/uapi \
             -I$kerneldir/arch/$srcarch/include \

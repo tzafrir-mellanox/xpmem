@@ -57,7 +57,8 @@ stages:
             displayName: Check gtest code format
             workingDirectory: $(System.DefaultWorkingDirectory)/test/gtest
 
-  - stage: Build
+  - stage: Docker
+    displayName: Build on Docker
     dependsOn: Codestyle
     jobs:
       - job: Build
@@ -91,7 +92,7 @@ stages:
               kernel_ver=$(rpm -qa | grep kernel-devel | cut -d'-' -f3-)
               ./configure --with-kerneldir=/usr/src/kernels/${kernel_ver}
               make
-            displayName: Build CentOS
+            displayName: Build on CentOS
             condition: contains(variables['build_container'], 'centos')
 
           - bash: |
@@ -100,13 +101,15 @@ stages:
               kernel_ver=$(dpkg -l | grep 'linux-headers-.*-generic' | awk '{print $2}')
               ./configure --enable-gtest --with-kerneldir=/usr/src/${kernel_ver}
               make
-            displayName: Build Ubuntu
+            displayName: Build on Ubuntu
             condition: contains(variables['build_container'], 'ubuntu')
 
-  - stage: Test
+  - stage: VMs
+    displayName: Build & Test on VMs
     dependsOn: Codestyle
     jobs:
       - job: Test
+        timeoutInMinutes: 240
         workspace:
           clean: all
         pool:
@@ -116,14 +119,17 @@ stages:
 
         strategy:
           matrix:
-            centos7:
-              BOX_NAME: centos7
+            ubuntu22-mainline:
+              BOX_NAME: ubuntu2204
+              KERNEL: mainline
+            ubuntu22:
+              BOX_NAME: ubuntu2204
             ubuntu18:
               BOX_NAME: ubuntu1804
             ubuntu20:
               BOX_NAME: ubuntu2004
-            ubuntu22:
-              BOX_NAME: ubuntu2204
+            centos7:
+              BOX_NAME: centos7
 
         steps:
           - checkout: self
@@ -153,8 +159,18 @@ stages:
             workingDirectory: $(System.DefaultWorkingDirectory)/ci/vm/
 
           - bash: |
+              set -x
+              hostname
+              export VAGRANT_HOME=/opt/vagrant_home
               vagrant destroy -f
               vagrant global-status --prune
+              set +e
+              virsh destroy vm_${BOX_NAME}
+              virsh undefine vm_${BOX_NAME}
+              sudo rm -rf /var/lib/libvirt/images/*
+              virsh pool-destroy  default
+              virsh pool-delete   default
+              virsh pool-undefine default
             condition: always()
             displayName: Bring down VM
             workingDirectory: $(System.DefaultWorkingDirectory)/ci/vm/
