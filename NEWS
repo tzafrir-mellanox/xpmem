@@ -9,6 +9,11 @@
 #### Kernel driver:
 ### Bugfixes:
 
+## 2.7.3 (October 5, 2023)
+### Bugfixes:
+ * Fixed compilation on kernel 6.5 onwards
+ * Fixed xpmem segments created twice
+
 ## 2.7.2 (July 12, 2023)
 ### Bugfixes:
  * Fixed compilation on kernel 6.3 onwards

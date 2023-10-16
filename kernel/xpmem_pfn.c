@@ -164,7 +164,7 @@ xpmem_vaddr_to_pte_offset(struct mm_struct *mm, u64 vaddr, u64 *offset)
 	}
 #endif
 
-	pte = pte_offset_map(pmd, vaddr);
+	pte = pte_offset_kernel(pmd, vaddr);
 	if (!pte_present(*pte))
 		return NULL;
 
@@ -218,7 +218,7 @@ xpmem_vaddr_to_pte_size(struct mm_struct *mm, u64 vaddr, u64 *size)
 		return NULL;
 	}
 
-	pte = pte_offset_map(pmd, vaddr);
+	pte = pte_offset_kernel(pmd, vaddr);
 	if (!pte_present(*pte)) {
 		*size = PAGE_SIZE;
 		return NULL;
