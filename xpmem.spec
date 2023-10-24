@@ -20,6 +20,10 @@
 
 %define need_firmware_dir 0%{?euleros} > 0
 
+%if "%_vendor" == "openEuler"
+%global __find_requires %{nil}
+%endif
+
 Summary: Cross-partition memory
 Name: xpmem
 Version: 2.7.3
