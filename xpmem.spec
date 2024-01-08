@@ -136,7 +136,7 @@ This package includes the kernel module (non KMP version).
 %endif # end of setup module sign scripts
 #
 
-%if 0%{?rhel} > 0
+%if 0%{?rhel} > 0 || 0%{euleros} >= 2
 %global install_mod_dir extra/%{_name}
 %endif
 
