@@ -13,7 +13,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.provision "shell", 
                         path: "provision2.sh", 
-                        args: "#{ENV['BOX_NAME']} #{kernel_val} #{ENV['SYSTEM_PULLREQUEST_PULLREQUESTNUMBER']}"
+                        args: "#{ENV['BOX_NAME']} #{ENV['SYSTEM_PULLREQUEST_PULLREQUESTNUMBER']}"
 
   config.vm.define "#{ENV['BOX_NAME']}" do |vm01|
     vm01.vm.provider :libvirt do |libvirt|

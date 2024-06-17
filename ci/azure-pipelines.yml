@@ -15,6 +15,7 @@ resources:
   containers:
     - container: centos7
       image: rdmz-harbor.rdmz.labs.mlnx/xpmem/x86_64/centos7:1
+      options: -v /hpc/local:/hpc/local -v /auto/sw_tools:/auto/sw_tools
     - container: centos8
       image: rdmz-harbor.rdmz.labs.mlnx/xpmem/x86_64/centos8:1
     - container: ubuntu18
@@ -56,6 +57,11 @@ stages:
             condition: eq(variables['Build.Reason'], 'PullRequest')
             displayName: Check gtest code format
             workingDirectory: $(System.DefaultWorkingDirectory)/test/gtest
+
+  - stage: Coverity
+    dependsOn: Codestyle
+    jobs:
+      - template: coverity.yml
 
   - stage: Docker
     displayName: Build on Docker
@@ -119,12 +125,11 @@ stages:
 
         strategy:
           matrix:
-            ubuntu22-mainline:
+            ubuntu2310:
+              BOX_NAME: ubuntu2310
+            ubuntu2204:
               BOX_NAME: ubuntu2204
-              KERNEL: mainline
-            ubuntu22:
-              BOX_NAME: ubuntu2204
-            ubuntu18:
+            ubuntu1804:
               BOX_NAME: ubuntu1804
             ubuntu20:
               BOX_NAME: ubuntu2004

@@ -175,12 +175,12 @@ struct xpmem_thread_group {
 	rwlock_t seg_list_lock;
 	struct list_head seg_list;	/* tg's list of segs */
 	atomic_t refcnt;	/* references to tg */
-	atomic_t n_pinned;	/* #of pages pinned by this tg */
+	atomic_long_t n_pinned;	/* #of pages pinned by this tg */
 	u64 addr_limit;		/* highest possible user addr */
 	struct list_head tg_hashlist;	/* tg hash list */
 	struct task_struct *group_leader;	/* thread group leader */
 	struct mm_struct *mm;	/* tg's mm */
-	atomic_t n_recall_PFNs;	/* #of recall of PFNs in progress */
+	atomic_long_t n_recall_PFNs;	/* #of recall of PFNs in progress */
 	struct mutex recall_PFNs_mutex;	/* lock for serializing recall of PFNs */
 	wait_queue_head_t block_recall_PFNs_wq;	/* wait to block recall of PFNs */
 	wait_queue_head_t allow_recall_PFNs_wq;	/* wait to allow recall of PFNs */
@@ -236,8 +236,8 @@ struct xpmem_attachment {
 
 struct xpmem_partition {
 	/* procfs debugging */
-	atomic_t n_pinned; 	/* # of pages pinned xpmem */
-	atomic_t n_unpinned; 	/* # of pages unpinned by xpmem */
+	atomic_long_t n_pinned; 	/* # of pages pinned xpmem */
+	atomic_long_t n_unpinned; 	/* # of pages unpinned by xpmem */
 
 	struct xpmem_hashlist tg_hashtable[];	/* locks + tg hash lists */
 };
@@ -300,7 +300,7 @@ extern void xpmem_detach_att(struct xpmem_access_permit *,
 extern int xpmem_mmap(struct file *, struct vm_area_struct *);
 
 /* found in xpmem_pfn.c */
-extern int xpmem_ensure_valid_PFN(struct xpmem_segment *, u64, struct page **,
+extern long xpmem_ensure_valid_PFN(struct xpmem_segment *, u64, struct page **,
 				  unsigned long);
 extern pte_t *xpmem_vaddr_to_pte_offset(
 	struct mm_struct *mm, u64 vaddr, u64 *offset);

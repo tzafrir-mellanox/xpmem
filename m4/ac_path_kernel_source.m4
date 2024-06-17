@@ -124,6 +124,16 @@ AC_DEFUN([AC_KERNEL_CHECKS],
     ], [], [[#include <linux/proc_fs.h>]])
   ], [[#include <linux/proc_fs.h>]])
 
+  AC_CHECK_DECL(pmd_leaf, [
+    AC_DEFINE([HAVE_PMD_LEAF_MACRO], 1, [Have pmd_leaf()])],
+    [], [[#include <linux/mm.h>]])
+  AC_CHECK_DECL(pud_leaf, [
+    AC_DEFINE([HAVE_PUD_LEAF_MACRO], 1, [Have pud_leaf()])],
+    [], [[#include <linux/mm.h>]])
+  AC_CHECK_DECL(pte_offset_map, [
+    AC_DEFINE([HAVE_PTE_OFFSET_MAP_MACRO], 1, [Have pte_offset_map()])],
+    [], [[#include <linux/mm.h>]])
+
   AC_CHECK_DECLS([vma_iter_init], [], [], [[#include <linux/mm_types.h>]])
 
   AC_MSG_CHECKING(latest apply_to_page_range support)

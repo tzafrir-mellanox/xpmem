@@ -10,6 +10,7 @@ RUN if [[ "$OS_VERSION" == 8 ]]; then \
 RUN yum install -y \
         automake \
         elfutils-libelf-devel \
+        environment-modules \
         kernel-headers \
         kernel-devel \
         libtool \

@@ -37,7 +37,18 @@
 #endif
 #endif
 
+#ifndef HAVE_PTE_MAP_OFFSET_MACRO
+#define pte_offset_map pte_offset_kernel
+#endif
+
 #if CONFIG_HUGETLB_PAGE
+
+#ifndef HAVE_PMD_LEAF_MACRO
+#define pmd_leaf pmd_large
+#endif
+#ifndef HAVE_PUD_LEAF_MACRO
+#define pud_leaf pud_large
+#endif
 
 #if (defined(CONFIG_ARM64) || defined(CONFIG_ARM))
 #define pmd_is_huge(p) pmd_sect(p)
@@ -47,10 +58,10 @@
 #define pud_is_huge(p) (0)
 #endif
 #elif defined(CONFIG_X86)
-#define pmd_is_huge(p) pmd_large(p)
-#define pud_is_huge(p) pud_large(p)
+#define pmd_is_huge(p) pmd_leaf(p)
+#define pud_is_huge(p) pud_leaf(p)
 #elif defined(CONFIG_PPC)
-#define pmd_is_huge(p) pmd_large(p)
+#define pmd_is_huge(p) pmd_leaf(p)
 #define pud_is_huge(p) ((pud_val(p) & 0x3) != 0x0)
 #else
 #error Unsuported architecture
@@ -273,8 +284,8 @@ static int remap_func(pte_t *pte, pgtable_t token, unsigned long addr,
 
 	if (old_pfn) {
 		xpmem_put_page(page);
-		atomic_dec(&seg->tg->n_pinned);
-		atomic_inc(&xpmem_my_part->n_unpinned);
+		atomic_long_dec(&seg->tg->n_pinned);
+		atomic_long_inc(&xpmem_my_part->n_unpinned);
 		return 0;
 	}
 
@@ -304,8 +315,8 @@ xpmem_remap_pages(struct xpmem_segment *seg,
 				  remap_func, &ctx);
 	for (i = ctx.index; i < nr_pages; i++) {
 		xpmem_put_page(ctx.pages[i]);
-		atomic_dec(&seg->tg->n_pinned);
-		atomic_inc(&xpmem_my_part->n_unpinned);
+		atomic_long_dec(&seg->tg->n_pinned);
+		atomic_long_inc(&xpmem_my_part->n_unpinned);
 	}
 	return ctx.result;
 }
@@ -313,12 +324,12 @@ xpmem_remap_pages(struct xpmem_segment *seg,
 /*
  * Fault in and pin a single page for the specified task and mm.
  */
-static int
+static long
 xpmem_pin_pages(struct xpmem_thread_group *tg, struct task_struct *src_task,
 	       struct mm_struct *src_mm, u64 vaddr, struct page **pages,
 	       unsigned long count)
 {
-	int nr_pinned;
+	long nr_pinned;
 	struct vm_area_struct *vma;
 	cpumask_t saved_mask = CPU_MASK_NONE;
 	int foll_write;
@@ -381,8 +392,8 @@ xpmem_pin_pages(struct xpmem_thread_group *tg, struct task_struct *src_task,
 		set_cpus_allowed_ptr(current, &saved_mask);
 
 	if (nr_pinned > 0) {
-		atomic_add(nr_pinned, &tg->n_pinned);
-		atomic_add(nr_pinned, &xpmem_my_part->n_pinned);
+		atomic_long_add(nr_pinned, &tg->n_pinned);
+		atomic_long_add(nr_pinned, &xpmem_my_part->n_pinned);
 	}
 	return nr_pinned;
 }
@@ -394,13 +405,13 @@ void
 xpmem_unpin_pages(struct xpmem_segment *seg, struct mm_struct *mm,
 			u64 vaddr, size_t size)
 {
-	int n_pgs = num_of_pages(vaddr, size);
-	int n_pgs_unpinned = 0;
+	long n_pgs = num_of_pages(vaddr, size);
+	long n_pgs_unpinned = 0;
 	struct page *page;
 	u64 pfn, vsize = 0;
 	pte_t *pte = NULL;
 
-	XPMEM_DEBUG("vaddr=%llx, size=%lx, n_pgs=%d", vaddr, size, n_pgs);
+	XPMEM_DEBUG("vaddr=%llx, size=%lx, n_pgs=%ld", vaddr, size, n_pgs);
 
 	/* Round down to the nearest page aligned address */
 	vaddr &= PAGE_MASK;
@@ -411,7 +422,7 @@ xpmem_unpin_pages(struct xpmem_segment *seg, struct mm_struct *mm,
 		if (pte) {
 			DBUG_ON(!pte_present(*pte));
 			pfn = pte_pfn(*pte);
-			XPMEM_DEBUG("pfn=%llx, vaddr=%llx, n_pgs=%d",
+			XPMEM_DEBUG("pfn=%llx, vaddr=%llx, n_pgs=%ld",
 					pfn, vaddr, n_pgs);
 			page = virt_to_page(__va(pfn << PAGE_SHIFT));
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0)
@@ -436,18 +447,17 @@ xpmem_unpin_pages(struct xpmem_segment *seg, struct mm_struct *mm,
 		}
 	}
 
-	atomic_sub(n_pgs_unpinned, &seg->tg->n_pinned);
-	atomic_add(n_pgs_unpinned, &xpmem_my_part->n_unpinned);
+	atomic_long_sub(n_pgs_unpinned, &seg->tg->n_pinned);
+	atomic_long_add(n_pgs_unpinned, &xpmem_my_part->n_unpinned);
 }
 
 /*
  * Given a virtual address and XPMEM segment, pin the page.
  */
-int
+long
 xpmem_ensure_valid_PFN(struct xpmem_segment *seg, u64 vaddr,
 		       struct page **pages, unsigned long count)
 {
-	int pinned;
 	struct xpmem_thread_group *seg_tg = seg->tg;
 
 	/* the seg may have been marked for destruction while we were down() */
@@ -455,9 +465,8 @@ xpmem_ensure_valid_PFN(struct xpmem_segment *seg, u64 vaddr,
 		return -ENOENT;
 
 	/* pin PFN */
-	pinned = xpmem_pin_pages(seg_tg, seg_tg->group_leader, seg_tg->mm, vaddr,
+	return xpmem_pin_pages(seg_tg, seg_tg->group_leader, seg_tg->mm, vaddr,
 			     pages, count);
-	return pinned;
 }
 
 /*
@@ -551,12 +560,12 @@ xpmem_block_recall_PFNs(struct xpmem_thread_group *tg, int wait)
 		if (waitqueue_active(&tg->allow_recall_PFNs_wq))
 			goto wait;
 
-		value = atomic_read(&tg->n_recall_PFNs);
+		value = atomic_long_read(&tg->n_recall_PFNs);
 		while (1) {
 			if (unlikely(value > 0))
 				break;
 
-			returned_value = atomic_cmpxchg(&tg->n_recall_PFNs,
+			returned_value = atomic_long_cmpxchg(&tg->n_recall_PFNs,
 							value, value - 1);
 			if (likely(returned_value == value))
 				break;
@@ -571,14 +580,14 @@ wait:
 			return -EAGAIN;
 
 		wait_event(tg->block_recall_PFNs_wq,
-			   (atomic_read(&tg->n_recall_PFNs) <= 0));
+			   (atomic_long_read(&tg->n_recall_PFNs) <= 0));
 	}
 }
 
 void
 xpmem_unblock_recall_PFNs(struct xpmem_thread_group *tg)
 {
-	if (atomic_inc_return(&tg->n_recall_PFNs) == 0)
+	if (atomic_long_inc_return(&tg->n_recall_PFNs) == 0)
 			wake_up(&tg->allow_recall_PFNs_wq);
 }
 
@@ -588,11 +597,11 @@ xpmem_disallow_blocking_recall_PFNs(struct xpmem_thread_group *tg)
 	int value, returned_value;
 
 	while (1) {
-		value = atomic_read(&tg->n_recall_PFNs);
+		value = atomic_long_read(&tg->n_recall_PFNs);
 		while (1) {
 			if (unlikely(value < 0))
 				break;
-			returned_value = atomic_cmpxchg(&tg->n_recall_PFNs,
+			returned_value = atomic_long_cmpxchg(&tg->n_recall_PFNs,
 							value, value + 1);
 			if (likely(returned_value == value))
 				break;
@@ -603,14 +612,14 @@ xpmem_disallow_blocking_recall_PFNs(struct xpmem_thread_group *tg)
 			return;
 
 		wait_event(tg->allow_recall_PFNs_wq,
-			  (atomic_read(&tg->n_recall_PFNs) >= 0));
+			  (atomic_long_read(&tg->n_recall_PFNs) >= 0));
 	}
 }
 
 static void
 xpmem_allow_blocking_recall_PFNs(struct xpmem_thread_group *tg)
 {
-	if (atomic_dec_return(&tg->n_recall_PFNs) == 0)
+	if (atomic_long_dec_return(&tg->n_recall_PFNs) == 0)
 		wake_up(&tg->block_recall_PFNs_wq);
 }
 
@@ -705,15 +714,15 @@ xpmem_unpin_procfs_show(struct seq_file *seq, void *offset)
 	struct xpmem_thread_group *tg;
 
 	if (tgid == 0) {
-		seq_printf(seq, "all pages pinned by XPMEM: %d\n"
-				"all pages unpinned by XPMEM: %d\n",
-				 atomic_read(&xpmem_my_part->n_pinned),
-				 atomic_read(&xpmem_my_part->n_unpinned));
+		seq_printf(seq, "all pages pinned by XPMEM: %ld\n"
+				"all pages unpinned by XPMEM: %ld\n",
+				 atomic_long_read(&xpmem_my_part->n_pinned),
+				 atomic_long_read(&xpmem_my_part->n_unpinned));
 	} else {
 		tg = xpmem_tg_ref_by_tgid(tgid);
 		if (!IS_ERR(tg)) {
-			seq_printf(seq, "pages pinned by XPMEM: %d\n",
-				   atomic_read(&tg->n_pinned));
+			seq_printf(seq, "pages pinned by XPMEM: %ld\n",
+				   atomic_long_read(&tg->n_pinned));
 			xpmem_tg_deref(tg);
 		}
 	}

@@ -5,7 +5,7 @@
 #include <unistd.h>
 
 #define NR_TEST_PAGES 	4
-#define PAGE_SIZE	sysconf(_SC_PAGE_SIZE)
+#define PAGE_SIZE	page_size()
 #define SHARE_SIZE	NR_TEST_PAGES * PAGE_SIZE
 #define PAGE_INT_SIZE	(PAGE_SIZE / sizeof(int))
 #define SHARE_INT_SIZE	(SHARE_SIZE / sizeof(int))
@@ -14,6 +14,24 @@
 #define TMP_SHARE_SIZE	32
 #define LOCK_INDEX	TMP_SHARE_SIZE - 1
 #define COW_LOCK_INDEX	TMP_SHARE_SIZE - 2
+
+static size_t page_size(void)
+{
+    static size_t size;
+    long ret;
+
+    if (size == 0) {
+        ret = sysconf(_SC_PAGE_SIZE);
+        if (ret <= 0) {
+            perror("sysconf(_SC_PAGE_SIZE)");
+            exit(EXIT_FAILURE);
+        }
+
+        size = ret;
+    }
+
+    return size;
+}
 
 xpmem_segid_t make_share(int **data, size_t size)
 {

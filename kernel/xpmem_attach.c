@@ -197,7 +197,7 @@ static int
 xpmem_fault_pages(struct xpmem_segment *seg, struct vm_area_struct *vma,
 		  u64 vaddr)
 {
-	int npages;
+	long npages;
 	u64 seg_vaddr;
 	u64 end;
 	u64 start;
@@ -265,9 +265,9 @@ xpmem_fault_pages(struct xpmem_segment *seg, struct vm_area_struct *vma,
 		}
 
 		XPMEM_DEBUG("calling xpmem_remap_pages() vaddr=%llx "
-			    "start=%llx npages=%d", vaddr, start, npages);
+			    "start=%llx npages=%ld", vaddr, start, npages);
 		result |= xpmem_remap_pages(seg, vma, vaddr, start, pages, npages);
-		start += npages << PAGE_SHIFT;
+		start += (u64)npages << PAGE_SHIFT;
 	}
 out:
 	if (!result) {
