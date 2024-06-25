@@ -37,7 +37,7 @@
 #endif
 #endif
 
-#ifndef HAVE_PTE_MAP_OFFSET_MACRO
+#ifndef HAVE_PTE_OFFSET_MAP_MACRO
 #define pte_offset_map pte_offset_kernel
 #endif
 
