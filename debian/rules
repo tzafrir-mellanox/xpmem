@@ -24,12 +24,12 @@ else
 kernel_source_args += --with-kernelvers=$(kernelver)
 endif
 
-ifeq "" "$(filter command environment,$(origin kernel_src_dir))"
-kernel_src_dir = /lib/modules/$(kernelver)/build
+ifeq "" "$(filter command environment,$(origin kernel_source_dir))"
+kernel_source_dir = /lib/modules/$(kernelver)/build
 else
-kernel_source_args += --with-kerneldir=$(kernel_src_dir)
+kernel_source_args += --with-kerneldir=$(kernel_source_dir)
 endif
-kernelver_real = $(shell make M=$$PWD -C $(kernel_src_dir) kernelrelease)
+kernelver_real = $(shell make M=$$PWD -C $(kernel_source_dir) kernelrelease)
 kernelver1 = $(subst _,-,$(kernelver))
 
 %:
@@ -75,5 +75,5 @@ override_dh_dkms:
 ifneq (,$(WITH_MODULES))
 override_dh_gencontrol:
 	dh_gencontrol -- -v$(DEB_VERSION).kver.$(kernelver1)
-	sed -i -e "s/@KERNEL_DIR@/$$kernel_src_dir/" debian/xpmem-modules/DEBIAN/control
+	sed -i -e "s|@KERNEL_DIR@|/lib/modules/$(kernelver)|" debian/xpmem-modules/DEBIAN/control
 endif
