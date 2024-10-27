@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([xpmem], [2.7], [http://github.com/openucx/xpmem/issues])
+AC_INIT([xpmem], [2.7.4], [http://github.com/openucx/xpmem/issues])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
 AC_CONFIG_SRCDIR([include/xpmem.h])
 AC_CONFIG_MACRO_DIR([m4])
@@ -68,11 +68,11 @@ AC_SUBST([initdir], [${sysconfdir}/init.d])
 AC_SUBST([ldsoconfdir], [/etc/ld.so.conf.d])
 AC_SUBST([pkgconfigdir], [${libdir}/pkgconfig])
 
-AC_PATH_KERNEL_SOURCE
 AC_KERNEL_CHECKS
 
 AC_CONFIG_FILES([Makefile
                  cray-xpmem.pc
+                 dkms.conf
                  module
                  include/Makefile
                  kernel/Kbuild

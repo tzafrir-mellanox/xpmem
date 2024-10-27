@@ -4,7 +4,7 @@
 
 # DKMS module name and version
 PACKAGE_NAME="xpmem"
-PACKAGE_VERSION="2.7.3"
+PACKAGE_VERSION="@PACKAGE_VERSION@"
 
 # module name
 BUILT_MODULE_NAME[0]="xpmem"
@@ -13,7 +13,7 @@ BUILT_MODULE_LOCATION[0]="kernel"
 # where we put it under the kernel modules directory
 DEST_MODULE_LOCATION[0]="/kernel/../updates/"
 # how to build it
-MAKE[0]="./configure --prefix=/opt/xpmem; make clean; make install"
+MAKE[0]="sh ./configure --with-kerneldir=$kernel_source_dir --with-kernelvers=$kernelver ; make"
 
 # clean up command
 CLEAN="make distclean"

@@ -14,10 +14,11 @@ udevrules_DATA = 56-xpmem.rules
 udevrulesdir = /lib/udev/rules.d
 
 EXTRA_DIST = \
-        56-xpmem.rules \
-        $(pkgconfig_DATA) \
-	xpmem-lib.spec \
-	xpmem-kmod.spec
+	56-xpmem.rules \
+	$(pkgconfig_DATA) \
+	xpmem.spec \
+	dkms.conf \
+	debian
 
 .version:
 	echo "#%Module" > $@

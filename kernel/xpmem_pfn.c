@@ -321,6 +321,8 @@ xpmem_remap_pages(struct xpmem_segment *seg,
 	return ctx.result;
 }
 
+static DEFINE_PER_CPU(cpumask_t, saved_mask_percpu);
+
 /*
  * Fault in and pin a single page for the specified task and mm.
  */
@@ -329,9 +331,9 @@ xpmem_pin_pages(struct xpmem_thread_group *tg, struct task_struct *src_task,
 	       struct mm_struct *src_mm, u64 vaddr, struct page **pages,
 	       unsigned long count)
 {
+	cpumask_t *saved_mask = NULL;
 	long nr_pinned;
 	struct vm_area_struct *vma;
-	cpumask_t saved_mask = CPU_MASK_NONE;
 	int foll_write;
 	unsigned long avail;
 
@@ -357,10 +359,12 @@ xpmem_pin_pages(struct xpmem_thread_group *tg, struct task_struct *src_task,
 	 */
 	if (xpmem_vaddr_to_pte_offset(src_mm, vaddr, NULL) == NULL &&
 	    cpu_to_node(task_cpu(current)) != cpu_to_node(task_cpu(src_task))) {
+		saved_mask = this_cpu_ptr(&saved_mask_percpu);
+
 #ifdef HAVE_STRUCT_TASK_STRUCT_CPUS_MASK
-		saved_mask = current->cpus_mask;
+		*saved_mask = current->cpus_mask;
 #else
-		saved_mask = current->cpus_allowed;
+		*saved_mask = current->cpus_allowed;
 #endif
 		set_cpus_allowed_ptr(current, cpumask_of(task_cpu(src_task)));
 	}
@@ -369,27 +373,28 @@ xpmem_pin_pages(struct xpmem_thread_group *tg, struct task_struct *src_task,
 	foll_write = (vma->vm_flags & VM_WRITE) ? FOLL_WRITE : 0;
 
 	/* get_user_pages()/get_user_pages_remote() faults and pins the page */
-#if     LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0)
+#ifdef HAVE_GUP_6_5
 	nr_pinned = get_user_pages_remote (src_mm, vaddr, count, foll_write, pages,
 				     NULL);
-#elif   LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
+#elif defined(HAVE_GUP_5_9)
 	nr_pinned = get_user_pages_remote (src_mm, vaddr, count, foll_write, pages,
 				     NULL, NULL);
-#elif   LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
+#elif defined(HAVE_GUP_4_10)
 	nr_pinned = get_user_pages_remote (src_task, src_mm, vaddr, count,
 				     foll_write, pages, NULL, NULL);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#elif defined(HAVE_GUP_4_9)
 	nr_pinned = get_user_pages_remote (src_task, src_mm, vaddr, count,
 				     foll_write, pages, NULL);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#elif defined(HAVE_GUP_4_8)
 	nr_pinned = get_user_pages_remote (src_task, src_mm, vaddr, count,
 				     foll_write, 0, pages, NULL);
 #else
 	nr_pinned = get_user_pages (src_task, src_mm, vaddr, count, foll_write, 0,
 			      pages, NULL);
 #endif
-	if (!cpumask_empty(&saved_mask))
-		set_cpus_allowed_ptr(current, &saved_mask);
+	if (saved_mask) {
+		set_cpus_allowed_ptr(current, saved_mask);
+	}
 
 	if (nr_pinned > 0) {
 		atomic_long_add(nr_pinned, &tg->n_pinned);

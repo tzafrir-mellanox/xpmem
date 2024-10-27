@@ -1,2 +1,3 @@
-debian/xpmem.udev
-xpmem-*.tar.*
+kernel/Kbuild
+kernel/Makefile
+kernel/xpmem

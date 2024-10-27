@@ -69,8 +69,8 @@
  *       major - major revision number (12-bits)
  *       minor - minor revision number (16-bits)
  */
-#define XPMEM_CURRENT_VERSION		0x00027003
-#define XPMEM_CURRENT_VERSION_STRING	"2.7.3"
+#define XPMEM_CURRENT_VERSION		0x00027004
+#define XPMEM_CURRENT_VERSION_STRING	PACKAGE_VERSION
 
 #define XPMEM_MODULE_NAME "xpmem"
 
@@ -268,7 +268,7 @@ struct xpmem_partition {
  */
 #define XPMEM_MAX_PAGE_FAULT_AFTER 32
 #define XPMEM_MAX_PAGE_FAULT_BEFORE 16
-#define XPMEM_MAX_PAGE_FAULTS 128
+#define XPMEM_MAX_PAGE_FAULTS 96
 
 struct xpmem_config {
 	rwlock_t lock;
