@@ -26,7 +26,7 @@
 
 Summary: Cross-partition memory
 Name: xpmem
-Version: 2.7.3
+Version: 2.7.4
 Release: %{_release}%{?_dist}
 License: GPLv2 and LGPLv2.1
 Group: System Environment/Libraries

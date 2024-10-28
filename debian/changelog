@@ -1,3 +1,9 @@
+xpmem (2.7.4-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Tzafrir Cohen <nvidia@cohens.org.il>  Mon, 28 Oct 2024 16:50:19 +0200
+
 xpmem (2.7.3-1) unstable; urgency=medium
 
   * Initial release.
