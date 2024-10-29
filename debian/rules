@@ -57,9 +57,7 @@ ifeq (,$(WITH_MODULES))
 	make dist-gzip
 	rm xpmem-lib.spec xpmem-kmod.spec
 	mkdir -p debian/xpmem-dkms/usr/src
-	tar xf xpmem-*.tar.gz -C debian/xpmem-dkms/usr/src
-	mv debian/xpmem-dkms/usr/src/xpmem-* \
-	   debian/xpmem-dkms/usr/src/xpmem-$(DEB_VERSION_UPSTREAM)
+	tar xf xpmem-${DEB_VERSION_UPSTREAM}.tar.gz -C debian/xpmem-dkms/usr/src
 else
 	cd kernel && make install DESTDIR=$(CURDIR)/debian/tmp
 	@if [ -d debian/tmp/usr/lib/modules ]; then \
