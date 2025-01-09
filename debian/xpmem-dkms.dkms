@@ -5,7 +5,7 @@ PACKAGE_VERSION="#MODULE_VERSION#"
 BUILT_MODULE_NAME[0]="xpmem"
 BUILT_MODULE_LOCATION[0]="kernel"
 DEST_MODULE_LOCATION[0]="/kernel/../updates/"
-MAKE[0]="./configure --with-kernel-dir=$kernel_source_dir && cd kernel && make"
+MAKE[0]="./configure --with-kerneldir=$kernel_source_dir && cd kernel && make"
 
 # Rebuild and autoinstall automatically when dkms_autoinstaller runs for a new kernel
 AUTOINSTALL="yes"
