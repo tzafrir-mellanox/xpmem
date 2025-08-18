@@ -80,6 +80,18 @@ repository or by downloading a tarball from the link above.
 This package includes development headers.
 %endif
 
+%package dkms
+Summary: XPMEM: DKMS-build drivers
+Requires: dkms
+%description dkms
+XPMEM is a Linux kernel module that enables a process to map the
+memory of another process into its virtual address space. Source code
+can be obtained by cloning the Git repository, original Mercurial
+repository or by downloading a tarball from the link above.
+
+This package includes the drivers as a DKMS package, to be built at
+package install time.
+
 # build KMP rpms?
 %if "%{KMP}" == "1"
 %global kernel_release() $(make -C %{1} M=$PWD kernelrelease | grep -v make)
@@ -159,6 +171,10 @@ fi
   $env \
   #
 %{make_build} %{make_kernel_only}
+rm -f xpmem-*.tar.gz
+touch xpmem-lib.spec xpmem-kmod.spec
+make dist-gzip
+rm xpmem-lib.spec xpmem-kmod.spec
 
 %install
 %{make_install} moduledir=%{moduledir} %{make_kernel_only}
@@ -172,6 +188,8 @@ rm -f $RPM_BUILD_ROOT/usr/lib*/pkgconfig/cray-xpmem.pc
 %if %{need_firmware_dir}
 mkdir -p $RPM_BUILD_ROOT/lib/firmware
 %endif
+mkdir -p $RPM_BUILD_ROOT%{_prefix}/src
+tar xf %{name}-%{version}.tar.gz -C $RPM_BUILD_ROOT%{_prefix}/src
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -191,6 +209,14 @@ if [ "$1" = 0 ]; then
 	fi
 fi
 
+%post dkms
+/usr/sbin/dkms add     %{name}/%{version} && \
+/usr/sbin/dkms build   %{name}/%{version} && \
+/usr/sbin/dkms install %{name}/%{version} || :
+
+%preun dkms
+/usr/sbin/dkms remove  %{name}/%{version} --all || :
+
 %files
 /lib/udev/rules.d/*-xpmem.rules
 %{_prefix}/lib/modules-load.d/xpmem.conf
@@ -206,6 +232,9 @@ fi
 %{_libdir}/libxpmem.so
 %{_libdir}/pkgconfig/cray-xpmem.pc
 %endif
+
+%files dkms
+%{_prefix}/src/%{name}-%{version}
 
 %if "%{KMP}" != "1"
 %files modules
