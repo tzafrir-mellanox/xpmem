@@ -9,6 +9,7 @@
 %global _release 1
 
 %bcond_with kernel_only
+%bcond_with binary_packages
 
 %if %{with kernel_only}
 %undefine _debugsource_packages
@@ -82,6 +83,13 @@ This package includes development headers.
 
 %package dkms
 Summary: XPMEM: DKMS-build drivers
+%if "%{_vendor}" == "suse"
+Provides:  xpmem-kmp = %{version}-%{release}, xpmem-kmp-default = %{version}-%{release}, xpmem-modules = %{version}-%{release}
+Obsoletes: xpmem-kmp < %{version}-%{release}, xpmem-kmp-default < %{version}-%{release}, xpmem-modules < %{version}-%{release}
+%else
+Provides:  kmod-xpmem = %{version}-%{release}, xpmem-modules = %{version}-%{release}
+Obsoletes: kmod-xpmem < %{version}-%{release}, xpmem-modules < %{version}-%{release}
+%endif
 Requires: dkms
 %description dkms
 XPMEM is a Linux kernel module that enables a process to map the
@@ -92,6 +100,7 @@ repository or by downloading a tarball from the link above.
 This package includes the drivers as a DKMS package, to be built at
 package install time.
 
+%if %{with binary_packages}
 # build KMP rpms?
 %if "%{KMP}" == "1"
 %global kernel_release() $(make -C %{1} M=$PWD kernelrelease | grep -v make)
@@ -147,6 +156,7 @@ This package includes the kernel module (non KMP version).
 
 %endif # end of setup module sign scripts
 #
+%endif # with binary_modules
 
 %if 0%{?rhel} > 0 || 0%{?euleros} >= 2
 %global install_mod_dir extra/%{_name}
@@ -166,8 +176,12 @@ if [ "$CROSS_COMPILE" != '' ]; then
 fi
 ./autogen.sh
 %{configure} \
+%if %{with binary_modules}
   --with-module-prefix= \
   --with-kerneldir=%{K_SRC} \
+%else
+  --disable-kernel-module \
+%endif
   $env \
   #
 %{make_build} %{make_kernel_only}
