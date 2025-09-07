@@ -11,10 +11,14 @@
 %bcond_with kernel_only
 %bcond_with binary_packages
 
+%if %{with binary_packages}
 %if %{with kernel_only}
 %undefine _debugsource_packages
 %global debug_package %{nil}
 %global make_kernel_only SUBDIRS=kernel
+%else
+%global make_kernel_only %{nil}
+%endif
 %else
 %global make_kernel_only %{nil}
 %endif
