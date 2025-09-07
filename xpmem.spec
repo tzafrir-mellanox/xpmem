@@ -156,7 +156,7 @@ This package includes the kernel module (non KMP version).
 
 %endif # end of setup module sign scripts
 #
-%endif # with binary_modules
+%endif # with binary_packages
 
 %if 0%{?rhel} > 0 || 0%{?euleros} >= 2
 %global install_mod_dir extra/%{_name}
@@ -176,7 +176,7 @@ if [ "$CROSS_COMPILE" != '' ]; then
 fi
 ./autogen.sh
 %{configure} \
-%if %{with binary_modules}
+%if %{with binary_packages}
   --with-module-prefix= \
   --with-kerneldir=%{K_SRC} \
 %else
@@ -250,9 +250,11 @@ fi
 %files dkms
 %{_prefix}/src/%{name}-%{version}
 
+%if %{with binary_packages}
 %if "%{KMP}" != "1"
 %files modules
 %{moduledir}/xpmem.ko
+%endif
 %endif
 
 %changelog
