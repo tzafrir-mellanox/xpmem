@@ -94,7 +94,6 @@ Obsoletes: xpmem-kmp < %{version}-%{release}, xpmem-kmp-default < %{version}-%{r
 Provides:  kmod-xpmem = %{version}-%{release}, xpmem-modules = %{version}-%{release}
 Obsoletes: kmod-xpmem < %{version}-%{release}, xpmem-modules < %{version}-%{release}
 %endif
-Requires: dkms
 %description dkms
 XPMEM is a Linux kernel module that enables a process to map the
 memory of another process into its virtual address space. Source code
