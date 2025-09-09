@@ -20,6 +20,28 @@ Description: kernel module for user-space process remapping - scripts
  .
  This package includes required user-space files for using the module.
 
+Package: libxpmem-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: libxpmem0 (= ${binary:Version}), ${misc:Depends}
+Description: libxpmem - development headers
+ XPMEM is a Linux kernel module that enables a process to map the
+ memory of another process into its virtual address space.
+ .
+ This package includes development headers for the userspace library.
+
+Package: libxpmem0
+Section: libs
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: libxpmem - userspace library of XPMEM
+ XPMEM is a Linux kernel module that enables a process to map the
+ memory of another process into its virtual address space.
+ .
+ This package includes the userspace library.
+
 Package: xpmem-dkms
 Architecture: all
 Build-Profiles: <!modules>
@@ -35,7 +57,7 @@ Architecture: any
 Build-Profiles: <modules>
 Depends: ${misc:Depends}, ${shlib:Depends}
 Multi-Arch:same
-Description: kernel module for user-space process remapping - DKMS
+Description: kernel module for user-space process remapping
  XPMEM is a Linux kernel module that enables a process to map the
  memory of another process into its virtual address space.
  .

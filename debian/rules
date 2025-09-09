@@ -23,6 +23,11 @@ kernelver = $(shell uname -r)
 else
 kernel_source_args += --with-kernelvers=$(kernelver)
 endif
+ifeq (,$(WITH_MODULES))
+nomodules = --disable-kernel-module
+else
+nomodules =
+endif
 
 ifeq "" "$(filter command environment,$(origin kernel_source_dir))"
 kernel_source_dir = /lib/modules/$(kernelver)/build
@@ -39,25 +44,35 @@ else
 	dh $@ --with autoreconf
 endif
 
+override_dh_autoreconf:
+	dh_autoreconf
+	rm -rf debian/xpmem-${DEB_VERSION_UPSTREAM}
+	mkdir debian/xpmem-${DEB_VERSION_UPSTREAM}
+	cp -a config* autogen.sh dkms.conf.in include kernel lib m4 test \
+		Makefile* cray-xpmem.pc.in module.in \
+		ltmain.sh ar-lib compile missing install-sh \
+		debian/xpmem-${DEB_VERSION_UPSTREAM}/
+
+
 override_dh_auto_configure:
-	dh_auto_configure -- $(kernel_source_args)
+	dh_auto_configure -- $(kernel_source_args) $(nomodules)
+	cp -a dkms.conf aclocal.m4 \
+		debian/xpmem-${DEB_VERSION_UPSTREAM}/
+
+override_dh_auto_clean:
+	dh_auto_clean || :
 
 override_dh_auto_build:
-ifneq (,$(WITH_MODULES))
-	cd kernel && make
-endif
+	dh_auto_build
 	cp 56-xpmem.rules debian/xpmem.udev
 
 override_dh_auto_test:
 
 override_dh_auto_install:
 ifeq (,$(WITH_MODULES))
-	rm -f xpmem-*.tar.gz
-	touch xpmem-lib.spec xpmem-kmod.spec
-	make dist-gzip
-	rm xpmem-lib.spec xpmem-kmod.spec
-	mkdir -p debian/xpmem-dkms/usr/src
-	tar xf xpmem-${DEB_VERSION_UPSTREAM}.tar.gz -C debian/xpmem-dkms/usr/src
+	dh_auto_install
+	mkdir -p debian/xpmem-dkms/usr/src/
+	cp -a debian/xpmem-${DEB_VERSION_UPSTREAM} debian/xpmem-dkms/usr/src/
 else
 	cd kernel && make install DESTDIR=$(CURDIR)/debian/tmp
 	@if [ -d debian/tmp/usr/lib/modules ]; then \
