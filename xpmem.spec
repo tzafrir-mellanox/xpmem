@@ -36,7 +36,7 @@ Release: %{_release}%{?_dist}
 License: GPLv2 and LGPLv2.1
 Group: System Environment/Libraries
 Packager: Tzafrir Cohen <nvidia@cohens.org.il>
-BuildRequires: automake autoconf
+BuildRequires: automake autoconf libtool
 URL: https://github.com/openucx/xpmem
 Source: %{name}-%{version}.tar.gz
 
