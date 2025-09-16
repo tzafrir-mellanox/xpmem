@@ -46,18 +46,9 @@ endif
 
 override_dh_autoreconf:
 	dh_autoreconf
-	rm -rf debian/xpmem-${DEB_VERSION_UPSTREAM}
-	mkdir debian/xpmem-${DEB_VERSION_UPSTREAM}
-	cp -a config* autogen.sh dkms.conf.in include kernel lib m4 test \
-		Makefile* cray-xpmem.pc.in module.in \
-		ltmain.sh ar-lib compile missing install-sh \
-		debian/xpmem-${DEB_VERSION_UPSTREAM}/
-
 
 override_dh_auto_configure:
 	dh_auto_configure -- $(kernel_source_args) $(nomodules)
-	cp -a dkms.conf aclocal.m4 \
-		debian/xpmem-${DEB_VERSION_UPSTREAM}/
 
 override_dh_auto_clean:
 	dh_auto_clean || :
@@ -71,8 +62,7 @@ override_dh_auto_test:
 override_dh_auto_install:
 ifeq (,$(WITH_MODULES))
 	dh_auto_install
-	mkdir -p debian/xpmem-dkms/usr/src/
-	cp -a debian/xpmem-${DEB_VERSION_UPSTREAM} debian/xpmem-dkms/usr/src/
+	debian/copy_dkms_files debian/xpmem-dkms/usr/src/xpmem-${DEB_VERSION_UPSTREAM}
 else
 	dh_auto_install
 	@if [ -d debian/tmp/usr/lib/modules ]; then \

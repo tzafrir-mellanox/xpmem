@@ -188,10 +188,6 @@ fi
   $env \
   #
 %{make_build} %{make_kernel_only}
-rm -f xpmem-*.tar.gz
-touch xpmem-lib.spec xpmem-kmod.spec
-make dist-gzip
-rm xpmem-lib.spec xpmem-kmod.spec
 
 %install
 %{make_install} moduledir=%{moduledir} %{make_kernel_only}
@@ -205,8 +201,7 @@ rm -f $RPM_BUILD_ROOT/usr/lib*/pkgconfig/cray-xpmem.pc
 %if %{need_firmware_dir}
 mkdir -p $RPM_BUILD_ROOT/lib/firmware
 %endif
-mkdir -p $RPM_BUILD_ROOT%{_prefix}/src
-tar xf %{name}-%{version}.tar.gz -C $RPM_BUILD_ROOT%{_prefix}/src
+debian/copy_dkms_files $RPM_BUILD_ROOT%{_prefix}/src/%{name}-%{version}
 
 %clean
 rm -rf $RPM_BUILD_ROOT

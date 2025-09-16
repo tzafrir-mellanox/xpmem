@@ -1,0 +1,25 @@
+#!/bin/sh
+
+# Copy the files needed to build dkms.
+# Currently dkms needs to re-run configure, and therefore carries
+# all the files configure rewrites.
+
+# Usage: parameter: target directory to copy files to
+
+set -e
+
+files="
+config.guess config.h.in config.sub configure configure.ac
+autogen.sh dkms.conf.in
+include kernel lib m4 test
+Makefile.am Makefile.in
+cray-xpmem.pc.in module.in
+ltmain.sh ar-lib compile missing install-sh
+dkms.conf aclocal.m4
+"
+
+target_dir="$1"
+rm -rf "$target_dir"
+mkdir -p "$target_dir"
+
+cp -a $files "$target_dir/"
