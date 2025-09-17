@@ -10,3 +10,5 @@ tmp/
 xpmem/
 xpmem-dkms/
 xpmem-modules/
+libxpmem-dev/
+libxpmem0/
