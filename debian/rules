@@ -74,7 +74,7 @@ ifeq (,$(WITH_MODULES))
 	mkdir -p debian/xpmem-dkms/usr/src/
 	cp -a debian/xpmem-${DEB_VERSION_UPSTREAM} debian/xpmem-dkms/usr/src/
 else
-	cd kernel && make install DESTDIR=$(CURDIR)/debian/tmp
+	dh_auto_install
 	@if [ -d debian/tmp/usr/lib/modules ]; then \
 		rm -rf debian/tmp/lib/modules; \
 		mkdir -p debian/tmp/lib; \
