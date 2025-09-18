@@ -9,9 +9,9 @@
 %global _release 1
 
 %bcond_with kernel_only
-%bcond_with binary_packages
+%bcond_with building_kmods
 
-%if %{with binary_packages}
+%if %{with building_kmods}
 %if %{with kernel_only}
 %undefine _debugsource_packages
 %global debug_package %{nil}
@@ -103,7 +103,7 @@ repository or by downloading a tarball from the link above.
 This package includes the drivers as a DKMS package, to be built at
 package install time.
 
-%if %{with binary_packages}
+%if %{with building_kmods}
 # build KMP rpms?
 %if "%{KMP}" == "1"
 %global kernel_release() $(make -C %{1} M=$PWD kernelrelease | grep -v make)
@@ -159,7 +159,7 @@ This package includes the kernel module (non KMP version).
 
 %endif # end of setup module sign scripts
 #
-%endif # with binary_packages
+%endif # with building_kmods
 
 %if 0%{?rhel} > 0 || 0%{?euleros} >= 2
 %global install_mod_dir extra/%{_name}
@@ -179,7 +179,7 @@ if [ "$CROSS_COMPILE" != '' ]; then
 fi
 ./autogen.sh
 %{configure} \
-%if %{with binary_packages}
+%if %{with building_kmods}
   --with-module-prefix= \
   --with-kerneldir=%{K_SRC} \
 %else
@@ -248,7 +248,7 @@ fi
 %files dkms
 %{_prefix}/src/%{name}-%{version}
 
-%if %{with binary_packages}
+%if %{with building_kmods}
 %if "%{KMP}" != "1"
 %files modules
 %{moduledir}/xpmem.ko
