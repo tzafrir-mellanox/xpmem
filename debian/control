@@ -22,6 +22,7 @@ Description: kernel module for user-space process remapping - scripts
  This package includes required user-space files for using the module.
 
 Package: libxpmem-dev
+Build-Profiles: <!modules>
 Section: libdevel
 Architecture: any
 Multi-Arch: same
@@ -33,6 +34,7 @@ Description: libxpmem - development headers
  This package includes development headers for the userspace library.
 
 Package: libxpmem0
+Build-Profiles: <!modules>
 Section: libs
 Architecture: any
 Multi-Arch: same
