@@ -171,6 +171,8 @@ This package includes the kernel module (non KMP version).
 
 %prep
 %setup -q
+# Update source version to match RPM version
+sed -i "s/AC_INIT(\[xpmem\], \[.*\]/AC_INIT([xpmem], [%{version}]/" configure.ac
 
 %build
 env=
